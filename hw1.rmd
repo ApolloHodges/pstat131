@@ -1,0 +1,70 @@
+library(tidyverse)
+library(tidymodels)
+library(ISLR)
+library(corrplot)
+#Apollo Hodges
+#Homework 1
+#PSTAT 131
+
+#Question 1: 
+Supervised learning uses given/inputed data in model for prediction/output.
+Unsupervised learning works without previously known data, essentially building itself up from scratch.
+
+#Question 2: 
+Regession models excel at predicting numerical values that can range while classification models are better at working with specific given values.
+
+#Question 3: 
+Reg: SSR and Coefficients
+Class: Accuaracy and Error Rate
+
+#Question 4: 
+Descriptive: Describes events/data and their relation to others.
+          
+Inferential: Makes inferences based on past events/data.
+           
+Predictive: Predicts future events/data gased on already data through patterns.
+
+#Question 5: 
+Mechanistic models use theory to predict events/outcomes while empirically-driven use previous                        events/outcomes to predict theory. They're similar in that they connect reality with theory, but                      different in the manner in which they do it.
+
+Empirically-driven models can often be easier to understand, as they start with already confirmed data                before creating theoretical data.
+
+The bias-variance trade-off is related to mechanistic and empirically-driven as both describe the                     ups-and-downs of taking various approaches when working with data.
+
+#Question 6:
+
+#Given a voter’s profile/data, how likely is it that they will vote in favor of the candidate?
+This is predictive, as you are making a prediction based on prior data.
+
+#How would a voter’s likelihood of support for the candidate change if they had personal contact with the candidate?
+This is inferential, as you are making an inference based on whether a prior event occured.
+
+#Problem 1:
+hist(mpg$hwy, xlab="Highway", main="MPG on Highway")
+
+Most cars average around 20-30 MPG on the highway, left leaning.
+
+#Problem 2:
+ggplot(mpg, aes(x=hwy, y=cty)) + geom_point()
+
+There is a strong correlation to cars MPG on the highway compared to in the city.
+
+#Problem 3:
+mpg %>% 
+  group_by(manufacturer) %>%
+  arrange(manufacturer)
+ggplot(data = mpg, aes(y=manufacturer)) + geom_bar()
+
+Dodge produced the most cars, while lincoln produced the least.
+
+#Problem 4:
+mpg %>%
+  group_by(cyl)
+ggplot(data = mpg, aes(x=hwy)) + geom_boxplot()
+
+#Problem 5:
+mpg2 <- select(mpg, .data$displ, .data$year, .data$cyl, .data$cty, .data$hwy)
+
+M = cor(mpg2)
+corrplot(M, method = 'number')
+
