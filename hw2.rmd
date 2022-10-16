@@ -1,0 +1,65 @@
+PSTAT 131
+Homework 2
+Code By: Apollo Hodges
+
+library(tidyverse)
+library(tidymodels)
+
+Qustion 1:
+
+age <- abalone$V9+1.5
+
+abalone$age <- age
+
+ggplot(data = abalone, aes(x=age)) + geom_bar()
+
+ggplot(data = abalone, aes(x=V9)) + geom_bar()
+
+Question 2:
+
+set.seed(4201)
+
+abalone_split <- initial_split(abalone, prop = 0.80, strata = age)
+
+abalone_train <- training(abalone_split)
+
+abalone_test <- testing(abalone_split)
+
+Question 3:
+I shouldn't use rings to predict age as they have 100% correlation already.
+
+abalone_recipe <-
+  recipe(V1 ~ V6, data = abalone_train)
+  
+abalone_recipe_2 <-
+  recipe(V2 ~ V3, data = abalone_train)
+  
+abalone_recipe_3 <-
+  recipe(V6 ~ V8, data = abalone_train)
+
+Question 4:
+lm_model <- linear_reg() %>% 
+  set_engine("lm")
+
+Question 5:
+lm_wflow <- workflow() %>% 
+  add_model(lm_model) %>% 
+  add_recipe(abalone_recipe_2)
+
+Question 6:  
+lm_fit <- fit(lm_wflow, abalone_train)
+
+abalone_train_res <- predict(lm_fit, new_data = abalone_train %>% select(-age))
+abalone_train_res %>% 
+  head()
+
+Question 7:
+rmse(abalone_train_res, truth = age, estimate = .pred)
+
+I'm not sure why I'm getting different lengths. Perhaps I messed up in an earlier bit?
+
+abalone_metrics <- <- metric_set(rmse, rsq, mae)
+
+abalone_metrics(abaloned_train_res, truth = age,
+                estimate = .pred)
+                                
