@@ -1,0 +1,211 @@
+---
+title: "Final Project"
+author: "Apollo Hodges"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+---
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE,
+                      warning = FALSE)
+```
+
+## Introduction
+
+Pokemon Gen 8 Random Battles is a popular battle format on the Battle Simulation Website Pokemon Showdown! In this format, each player is given 6 random Pokemon, and the goal of the game is to use these Pokemon to knock out your opponents.
+
+In this project, we're going to be attempting to calculate what an individual Pokemon's win rate is based on a few factors, namely its level, stats, and typing. This is useful, as Pokemon Showdown! is soon to add a bunch of new Pokemon in Gen 9 Random Battles, so we can actually use these predictions to predict win rates for those Pokemon too.
+
+
+## Loading Packages and splitting data.
+
+First, we're going to clean and split our data into training and testing sets. Then we'll use cross-fold validation to rotate training and testing data and validate our outcome.
+
+
+```{r}
+library(tidymodels)
+library(ISLR)
+library(ISLR2)
+library(tidyverse)
+library(glmnet)
+library(janitor)
+library(corrr)
+library(rpart.plot)
+library(vip)
+library(randomForest)
+library(ranger)
+tidymodels_prefer()
+
+set.seed(1008)
+
+pokemon <- read.csv(file = 'ranbatsdata.csv')
+Pokemon <- tibble(pokemon)
+Pokemon_Cleaned <- clean_names(Pokemon)
+
+df <- Pokemon_Cleaned$type2
+df[df == '']<-'N/A'
+
+Pokemon_Cleaned$type1 <- factor(Pokemon_Cleaned$type1)
+Pokemon_Cleaned$type1 <- factor(Pokemon_Cleaned$type2)
+
+Auto_split <- initial_split(Pokemon_Cleaned, strata = win_rate, prop = 0.7)
+Auto_split
+
+Auto_train <- training(Auto_split)
+Auto_test <- testing(Auto_split)
+
+lm_spec <- linear_reg() %>%
+  set_mode("regression") %>%
+  set_engine("lm")
+
+Auto_folds <- vfold_cv(Auto_train, v = 9)
+Auto_folds
+
+pkmn_recipe <- recipe(win_rate ~  level+type1+type2+speed+attack+defense+sp_atk+sp_def+hp,
+                      data = Auto_train) %>%
+  step_dummy(all_nominal_predictors()) %>% 
+  step_normalize(all_numeric_predictors())
+
+```
+
+## Finding Correlation
+
+Now that we have everything set up, let's see if there's any correlation between factors.
+
+```{r}
+cor_pkmn <- Auto_train %>%
+  select(win_rate, level,type1,speed,attack,defense,sp_atk,sp_def,hp) %>%
+  correlate()
+rplot(cor_pkmn, print_cor=TRUE)
+
+```
+
+We can see that level has a negative correlation with most of the factors. This makes sense, as each Pokemon's level is lowered or raised based on how strong or weak a Pokemon is. In terms of stats, speed has the highest correlation with win rate. Interestingly, attack has a higher correlation than Special Attack. I actually asked a highly rated player at this game about this beforehand, and she predicted this would be the case as well, explaining that attack is often more valuable than special attack.
+
+
+## Linear Regression
+
+Next, we'll use Linear Regression and observe the results.
+
+```{r}
+pkmn_spec <- linear_reg(mixture = 0, penalty = 0) %>%
+  set_mode("regression") %>%
+  set_engine("glmnet")
+
+pkmn_fit <- fit(pkmn_spec, win_rate ~ level+type1+type2+speed+attack+defense+sp_atk+sp_def+hp, data = Auto_train)
+
+pkmn_workflow <- workflow() %>% 
+  add_recipe(pkmn_recipe) %>% 
+  add_model(pkmn_spec)
+
+tidy(pkmn_fit)
+
+wrpred <-predict(pkmn_fit, new_data = Auto_test)
+
+plot(wrpred$.pred,Auto_test$win_rate)
+
+hist(Auto_test$win_rate - wrpred$.pred, breaks=20, col="red")
+
+```
+
+The outlier here is actually from Silvally (Electric). The reason this is the case is because its win rate is a lot higher than one might expect, likely due to the low sample size of games it's is in comparison to other Pokemon. While I could remove it, I thought it would be interesting to see if the model could predict it.
+
+
+## Lasso Regression
+
+Next up, lasso!
+
+```{r}
+lasso_spec <- 
+  linear_reg(penalty = tune(), mixture = 1) %>% 
+  set_mode("regression") %>% 
+  set_engine("glmnet") 
+
+lasso_workflow <- workflow() %>% 
+  add_recipe(pkmn_recipe) %>% 
+  add_model(lasso_spec)
+
+penalty_grid <- grid_regular(penalty(range = c(-2, 2)), levels = 50)
+
+tune_res <- tune_grid(
+  lasso_workflow,
+  resamples = Auto_folds, 
+  grid = penalty_grid
+)
+
+tune_res
+autoplot(tune_res)
+
+best_model <- select_best(tune_res, metric = "rsq")
+
+pkmn_final <- finalize_workflow(pkmn_workflow, best_model)
+
+pkmn_final_fit <- fit(pkmn_final, data = Auto_train)
+
+predicted_data <- augment(pkmn_final_fit, new_data = Auto_test) %>% 
+  select(win_rate, starts_with(".pred"))
+
+plot(predicted_data$win_rate, predicted_data$.pred)
+
+hist(predicted_data$win_rate - predicted_data$.pred, breaks=20, col="red")
+
+
+```
+
+## Regression Tree
+
+And finally, a regression tree.
+
+```{r}
+tree_spec <- decision_tree() %>%
+  set_engine("rpart")
+
+reg_tree_spec <- tree_spec %>%
+  set_mode("regression")
+
+reg_tree_fit <- fit(reg_tree_spec, win_rate ~ level+type1+type2+speed+attack+defense+sp_atk+sp_def+hp, Auto_train)
+reg_tree_fit
+
+reg_tree_fit %>%
+  extract_fit_engine() %>%
+  rpart.plot()
+
+reg_tree_wf <- workflow() %>%
+  add_model(reg_tree_spec %>% set_args(cost_complexity = tune())) %>%
+  add_formula(win_rate ~ level+type1+type2+speed+attack+defense+sp_atk+sp_def+hp)
+
+param_grid <- grid_regular(cost_complexity(range = c(-4, -1)), levels = 10)
+
+tune_res_tree <- tune_grid(
+  reg_tree_wf, 
+  resamples = Auto_folds, 
+  grid = param_grid
+)
+
+autoplot(tune_res_tree)
+
+best_complexity <- select_best(tune_res_tree, metric = "rsq")
+
+reg_tree_final <- finalize_workflow(reg_tree_wf, best_complexity)
+
+reg_tree_final_fit <- fit(reg_tree_final, data = Auto_train)
+reg_tree_final_fit
+
+reg_tree_final_fit %>%
+  extract_fit_engine() %>%
+  rpart.plot()
+
+predicted_data_tree <- augment(reg_tree_final_fit, new_data = Auto_test) %>% 
+  select(win_rate, starts_with(".pred"))
+
+hist(predicted_data_tree$win_rate - predicted_data_tree$.pred, breaks=20, col="red")
+```
+
+We find that our Tree model is slightly worse at predicting win rates than our other two models.
+
+In conclusion, these models aren't actually great at prediction win rates. It's possible that more factors, such as moves and items may help these models predict with more accuracy. However, as with the namesake, there is definately some randomness in it.
+
+Another thing to note, I included both Zarude and Zarude-Dada as seperate entries despite sharing almost all factors. This is because they actually have significantly different win rates. This is an example of how win rates can be flawed in this random game.

@@ -1,0 +1,25 @@
+Pokemon: The name of each Pokemon.
+
+Level: Each Pokemon's level. Levels are used as a tool to balance each Pokemon's power.
+
+Ability, Item, and Moves: These factors contain the possible abilities, items, and moves each Pokemon can have. 
+However, due to the nature of these factors (very unique and different from each other), I decided not to use it in predicting win rate.
+
+WinRate: The win rate of a Pokemon when in a game. This is the factor we will attempting to predict.
+
+Type1 and Type2: The typing of each Pokemon. A key thing to note is that some Pokemon only have one type.
+
+Speed,HP,Attack,Defense,SpAtk, and SpDef: These are the stats of each Pokemon. 
+
+-Speed determines which Pokemon goes first.
+-Attack and SpAtk help determine how much damage a Physical or Special move will do respectively.
+-Defense and SpDef help determine how much damage a Pokemon will resist from a Physical or Special move respectively.
+-HP determines the starting Hit Points of a Pokemon. In battle, a Pokemon faints when it's HP is reduced to 0.
+
+
+This dataset was created with the help of the following sources:
+-https://gist.github.com/AnnikaCodes/1cbac4b1fd5fb92be57ea8e8b82dab61
+-https://pkmn.github.io/randbats/data/js/gen8randombattle.js
+-https://www.kaggle.com/datasets/tlegrand/pokemon-with-stats-generation-8
+
+Special thanks to my sister, an expert at Random Battles (Peaked at 3rd place in the world) for sharing her expertise.
